@@ -36,5 +36,5 @@ Examples:
 2) Run with actual slack posts:
 
 ```
-./wireslacker -dry -targets="target1,target2" -webhook="https://hooks.slack.com/services/..."
+./wireslacker -targets="target1,target2" -webhook="https://hooks.slack.com/services/..."
 ```
