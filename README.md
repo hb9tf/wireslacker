@@ -13,8 +13,8 @@ In order to run, you need two things:
   Currently, only HTTP(S) targets are supported while file reads would also be possible.
   The target should look something like this:
 
-    * For node log: http://<IP>:<port>/roomlog.html?wipassword=<password>
-    * For room log: http://<IP>:<port>/roomlog.html?wipassword=<password>
+    * For node log: http://IP:port/roomlog.html?wipassword=password
+    * For room log: http://IP:port/roomlog.html?wipassword=password
 
   Where obviously some variables need to be filled in. The default port is 46190 and can be
   set in the Wires-X application together with the password.
@@ -23,16 +23,18 @@ In order to run, you need two things:
 
   For more information on webhooks, see https://api.slack.com/custom-integrations/outgoing-webhooks
 
+  A valid webhook URL starts like this: https://hooks.slack.com/services/
+
 Examples:
 
 1) Run in dry-run (no slack updates):
 
 ```
-./wireslacker -dry -targets="<target1,target2>" -webhook="https://hooks.slack.com/services/..."
+./wireslacker -dry -targets="target1,target2" -webhook="https://hooks.slack.com/services/..."
 ```
 
 2) Run with actual slack posts:
 
 ```
-./wireslacker -dry -targets="<target1,target2>" -webhook="https://hooks.slack.com/services/..."
+./wireslacker -dry -targets="target1,target2" -webhook="https://hooks.slack.com/services/..."
 ```
