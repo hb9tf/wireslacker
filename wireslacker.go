@@ -21,6 +21,8 @@ var (
 	dry          = flag.Bool("dry", false, "do not post to slack channel if true")
 )
 
+// readEvery reads the Wires-X log from the provided target every d and sends the
+// parsed log to the provided logChan for further processing.
 func readEvery(d time.Duration, target string, logChan chan *data.Log) error {
 	reader, err := reader.New(target)
 	if err != nil {
@@ -41,6 +43,7 @@ func readEvery(d time.Duration, target string, logChan chan *data.Log) error {
 func main() {
 	flag.Parse()
 
+	// Ensure necessary flags have been provided.
 	if *webHook == "" {
 		fmt.Println("provide a valid webhook URL for slack")
 		os.Exit(1)
@@ -50,9 +53,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Create log channel and start processing of incoming data.
 	logChan := make(chan *data.Log)
 	go processor.Run(logChan, processor.NewSlacker(*webHook, *dry))
 
+	// Start a reader for each target which has been provided.
 	var wg sync.WaitGroup
 	for _, target := range strings.Split(*targets, ",") {
 		wg.Add(1)
