@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/finfinack/wireslack/data"
-	"github.com/finfinack/wireslack/processor"
-	"github.com/finfinack/wireslack/reader"
+	"github.com/finfinack/wireslacker/data"
+	"github.com/finfinack/wireslacker/processor"
+	"github.com/finfinack/wireslacker/reader"
 )
 
 var (

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/finfinack/wireslack/data"
+	"github.com/finfinack/wireslacker/data"
 )
 
 const (
