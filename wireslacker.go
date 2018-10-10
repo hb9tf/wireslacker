@@ -18,24 +18,29 @@ var (
 	targets      = flag.String("targets", "", "coma separated paths or URLs to the log files")
 	readInterval = flag.Duration("readInterval", 10*time.Second, "interval in which to read the provided logs")
 	webHook      = flag.String("webhook", "", "webhook to use to post to slack")
+	verbose      = flag.Bool("v", false, "log more detailed messages")
 	dry          = flag.Bool("dry", false, "do not post to slack channel if true")
 )
 
 // readEvery reads the Wires-X log from the provided target every d and sends the
 // parsed log to the provided logChan for further processing.
-func readEvery(d time.Duration, target string, logChan chan *data.Log) error {
-	reader, err := reader.New(target)
+// Note that only non-recoverable errors should return. Retryable ones should log only.
+func readEvery(d time.Duration, target string, verbose bool, logChan chan *data.Log) error {
+	reader, err := reader.New(target, verbose)
 	if err != nil {
 		return fmt.Errorf("unable to get reader: %v", err)
 	}
 
-	for now := range time.Tick(d) {
-		log.Printf("Polling log %q: %v\n", target, now)
-		log, err := reader.Read()
-		if err != nil {
-			return err
+	for _ = range time.Tick(d) {
+		if verbose {
+			log.Printf("V: Polling log %q", target)
 		}
-		logChan <- log
+		evtLog, err := reader.Read()
+		if err != nil {
+			log.Printf("Unable to poll log %q (temporarily?): %v", target, err)
+			continue // we don't want to abort in this case and retry later
+		}
+		logChan <- evtLog
 	}
 	return nil
 }
@@ -55,7 +60,7 @@ func main() {
 
 	// Create log channel and start processing of incoming data.
 	logChan := make(chan *data.Log)
-	go processor.Run(logChan, processor.NewSlacker(*webHook, *dry))
+	go processor.Run(logChan, processor.NewSlacker(*webHook, *dry), *verbose)
 
 	// Start a reader for each target which has been provided.
 	var wg sync.WaitGroup
@@ -64,8 +69,8 @@ func main() {
 		go func(target string) {
 			defer wg.Done()
 			log.Printf("Start polling %q\n", target)
-			if err := readEvery(*readInterval, target, logChan); err != nil {
-				fmt.Println(err)
+			if err := readEvery(*readInterval, target, *verbose, logChan); err != nil {
+				log.Printf("Unable to poll log %q (stopping): %v", target, err)
 				return
 			}
 		}(target)

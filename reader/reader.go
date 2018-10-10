@@ -3,6 +3,7 @@ package reader
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -36,10 +37,11 @@ type Log interface {
 }
 
 // New creates a new Log reader matching the provided target.
-func New(target string) (Log, error) {
+func New(target string, verbose bool) (Log, error) {
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
 		return &HTTP{
 			target,
+			verbose,
 		}, nil
 	}
 	return nil, fmt.Errorf("no reader for %q not implemented, provide an alternative target", target)
@@ -47,7 +49,8 @@ func New(target string) (Log, error) {
 
 // HTTP implements the Log interface and reads the log from an HTTP/S target.
 type HTTP struct {
-	target string
+	target  string
+	verbose bool
 }
 
 // read grabs the raw log from the target and returns it as a string.
@@ -70,6 +73,9 @@ func (r *HTTP) Read() (*data.Log, error) {
 	s, err := r.read()
 	if err != nil {
 		return nil, err
+	}
+	if r.verbose {
+		log.Printf("V: Read %d bytes from %q", len(s), r.target)
 	}
 	lines := strings.Split(s, "<br>")
 

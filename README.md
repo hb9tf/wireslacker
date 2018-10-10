@@ -48,4 +48,7 @@ TODOs:
 
 * Migrate the Slacker processor into something more generic (allowing other use).
 
-* Extend Slacker to format messages a bit more nicely.
+* Extend Slacker to format messages a bit more nicely or use at least templating.
+
+* Write unit tests.
+

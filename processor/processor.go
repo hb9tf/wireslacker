@@ -12,6 +12,12 @@ import (
 	"github.com/finfinack/wireslacker/data"
 )
 
+const (
+	httpPOST        = "POST"
+	httpContentType = "Content-Type"
+	httpJSON        = "application/json"
+)
+
 var (
 	// lastSeen is used to keep the timestamp of the last event that was processed.
 	// Only if a newer event is seen, it is processed/posted.
@@ -46,8 +52,8 @@ type Slacker struct {
 // Post sends the provided message to the webhook, posting it in the channel.
 func (s *Slacker) Post(msg string) error {
 	body := []byte(fmt.Sprintf(`{"text":"%s"}`, msg))
-	req, err := http.NewRequest("POST", s.webhook, bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
+	req, err := http.NewRequest(httpPOST, s.webhook, bytes.NewBuffer(body))
+	req.Header.Set(httpContentType, httpJSON)
 	if s.dry {
 		log.Printf("DRY-MODE: Slack message: %v\n", req)
 		return nil
@@ -72,16 +78,25 @@ func filter(evt *data.Event) bool {
 }
 
 // Run iterates over all logs provided in the log channel and posts new messages using the Slacker provided.
-func Run(logChan chan *data.Log, slkr *Slacker) {
-	for log := range logChan {
-		sort.Sort(data.ByAge(log.Events))
-		for _, evt := range log.Events {
+func Run(logChan chan *data.Log, slkr *Slacker, verbose bool) {
+	logCount := 0
+	for evtLog := range logChan {
+		logCount++
+		evtCount := 0
+		evtFltrCount := 0
+		sort.Sort(data.ByAge(evtLog.Events))
+		for _, evt := range evtLog.Events {
+			evtCount++
 			if filter(evt) {
+				evtFltrCount++
 				continue
 			}
 			lastSeen = evt.Ts
-			fmt.Printf("New message from %s (%s): %v\n", log.ID, log.Type, evt)
-			slkr.Post(fmt.Sprintf("%s (%s) @ %s: %s", log.ID, log.Type, evt.Ts.Format(timePostFormat), evt.Msg))
+			log.Printf("New message from %s (%s): %v\n", evtLog.ID, evtLog.Type, evt)
+			slkr.Post(fmt.Sprintf("%s (%s) @ %s: %s", evtLog.ID, evtLog.Type, evt.Ts.Format(timePostFormat), evt.Msg))
+		}
+		if verbose {
+			log.Printf("V: Processed log %d, total of %d events, filtered %d", logCount, evtCount, evtFltrCount)
 		}
 	}
 }
