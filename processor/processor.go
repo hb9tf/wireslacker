@@ -85,16 +85,18 @@ func Run(logChan chan *data.Log, slkr *Slacker, verbose bool) {
 		evtCount := 0
 		evtFltrCount := 0
 		sort.Sort(data.ByAge(evtLog.Events))
+		var lastTs time.Time
 		for _, evt := range evtLog.Events {
 			evtCount++
 			if filter(evt) {
 				evtFltrCount++
 				continue
 			}
-			lastSeen = evt.Ts
+			lastTs = evt.Ts
 			log.Printf("New message from %s (%s): %v\n", evtLog.ID, evtLog.Type, evt)
 			slkr.Post(fmt.Sprintf("%s (%s) @ %s: %s", evtLog.ID, evtLog.Type, evt.Ts.Format(timePostFormat), evt.Msg))
 		}
+		lastSeen = lastTs
 		if verbose {
 			log.Printf("V: Processed log %d, total of %d events, filtered %d", logCount, evtCount, evtFltrCount)
 		}
