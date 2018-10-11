@@ -25,6 +25,10 @@ In order to run, you need two things:
 
   A valid webhook URL starts like this: https://hooks.slack.com/services/
 
+If the Wires-X server you are polling sits in a different timezone than the server which
+runs wireslacker, you will also have to provide the location as a flag (-location). See
+https://golang.org/pkg/time/#LoadLocation for more information on how to specify this.
+
 Examples:
 
 1) Run in dry-run (no slack updates):
