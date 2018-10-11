@@ -78,8 +78,8 @@ type Location struct {
 	City    string
 	State   string
 	Country string
-	Lat     float64
-	Lon     float64
+	Lat     string
+	Lon     string
 }
 
 type Attachment struct {

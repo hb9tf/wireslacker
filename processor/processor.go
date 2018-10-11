@@ -114,8 +114,8 @@ func enrich(evtLog *data.Log, evt *data.Event, msg *data.Message, verbose bool) 
 		loc := "n/a"
 		if n.Location != nil {
 			loc = fmt.Sprintf("%s, %s, %s", n.Location.City, n.Location.State, n.Location.Country)
-			if n.Location.Lat != float64(0) && n.Location.Lon != float64(0) {
-				loc = fmt.Sprintf("<https://www.google.com/maps/@%f,%f%s>", n.Location.Lat, n.Location.Lon, loc)
+			if n.Location.Lat != "" && n.Location.Lon != "" {
+				loc = fmt.Sprintf("<https://www.google.com/maps/place/%s+%s|%s>", n.Location.Lat, n.Location.Lon, loc)
 			}
 		}
 		text := []string{
