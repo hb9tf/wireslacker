@@ -31,8 +31,8 @@ var (
 		"Browser connected from", // each poll creates such an entry, ignore them
 	}
 
-	inCallRE    = regexp.MustCompile("\\*-\\*-\\* In-Call from No.[0-9]+ \\*-\\*-\\*")
-	callStartRE = regexp.MustCompile("\\*-\\*-\\* Call Start No.[0-9]+ \\*-\\*-\\*")
+	inCallRE    = regexp.MustCompile("\\*-\\*-\\* In-Call from No.([0-9]+) \\*-\\*-\\*")
+	callStartRE = regexp.MustCompile("\\*-\\*-\\* Call Start No.([0-9]+) \\*-\\*-\\*")
 )
 
 // NewSlacker creates a new Slacker for the provided webhook.
