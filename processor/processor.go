@@ -34,17 +34,23 @@ var (
 		"Browser connected from", // each poll creates such an entry, ignore them
 	}
 
-	inCallRE      = regexp.MustCompile("\\*-\\*-\\* In-Call from No.([0-9]+) \\*-\\*-\\*")
-	callStartRE   = regexp.MustCompile("\\*-\\*-\\* Call Start No.([0-9]+) \\*-\\*-\\*")
-	connectedToRE = regexp.MustCompile("Connected to .+\\(([0-9]+)\\)\\.")
+	// Mixed node and room RE
+	callStartRE   = regexp.MustCompile("Call Start No.([0-9]+)")
+	connectedToRE = regexp.MustCompile("Connected to (.+)\\(([0-9]+)\\)\\.")
+	// Node only RE
+	nodeInCallRE = regexp.MustCompile("In-Call from No.([0-9]+)")
+	// Room only RE
+	nodeInRE  = regexp.MustCompile("(.+)\\(([0-9]+)\\) IN\\.")
+	nodeOutRE = regexp.MustCompile("(.+)\\(([0-9]+)\\) OUT\\.")
 )
 
 // NewSlacker creates a new Slacker for the provided webhook.
-func NewSlacker(webhook string, dry bool) *Slacker {
+func NewSlacker(webhook string, dry bool, verbose bool) *Slacker {
 	return &Slacker{
 		webhook,
 		&http.Client{},
 		dry,
+		verbose,
 	}
 }
 
@@ -53,6 +59,7 @@ type Slacker struct {
 	webhook string
 	client  *http.Client
 	dry     bool
+	verbose bool
 }
 
 // Post sends the provided message to the webhook, posting it in the channel.
@@ -63,8 +70,10 @@ func (s *Slacker) Post(msg *data.Message) error {
 	}
 	req, err := http.NewRequest(httpPOST, s.webhook, bytes.NewBuffer(data))
 	req.Header.Set(httpContentType, httpJSON)
+	if s.verbose {
+		log.Printf("V: Posting Slack message: %v", req)
+	}
 	if s.dry {
-		log.Printf("DRY-MODE: Slack message: %v", req)
 		return nil
 	}
 	_, err = s.client.Do(req)
@@ -87,20 +96,20 @@ func filter(evt *data.Event, notBefore time.Time) bool {
 }
 
 // enrich is a simple function to pass all events through and add more information if available.
-func enrich(evtLog *data.Log, evt *data.Event, msg *data.Message) *data.Message {
+func enrich(evtLog *data.Log, evt *data.Event, msg *data.Message, verbose bool) *data.Message {
 	// Attempt to resolve some information about calling nodes.
 	var n *data.Node
-	if match := inCallRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+	if match := nodeInCallRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
 		n = resolver.FindNode("", match[1], "")
 	} else if match := callStartRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
-		n = resolver.FindNode("", match[1], "")
+		n = resolver.FindNode(match[1], match[2], "")
 	} else if match := connectedToRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
 		n = resolver.FindNode("", match[1], "")
 	}
 	if n != nil {
 		loc := "n/a"
 		if n.Location != nil {
-			loc = fmt.Sprintf("%s, %s, %s", n.ID, n.Location.City, n.Location.State, n.Location.Country)
+			loc = fmt.Sprintf("%s, %s, %s", n.Location.City, n.Location.State, n.Location.Country)
 			if n.Location.Lat != float64(0) && n.Location.Lon != float64(0) {
 				loc = fmt.Sprintf("<https://www.google.com/maps/@%f,%f%s>", n.Location.Lat, n.Location.Lon, loc)
 			}
@@ -112,14 +121,50 @@ func enrich(evtLog *data.Log, evt *data.Event, msg *data.Message) *data.Message 
 		if n.Freq != "" {
 			text = append(text, fmt.Sprintf("Frequency: %s (%s)", n.Freq, n.SQL))
 		}
+		if n.Comment != "" {
+			text = append(text, fmt.Sprintf("Comment: %s", n.Comment))
+		}
 		msg.Attachments[0].Text = strings.Join(text, "\n")
 		msg.Attachments[0].Color = slackColorGood
-		log.Printf("V: Enriched message with location: %v", msg)
+		if verbose {
+			log.Printf("V: Enriched message with node information: %v", msg)
+		}
 	}
+
+	// Attempt to resolve some information about rooms.
+	var r *data.Room
+	if match := callStartRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		r = resolver.FindRoom(match[1], match[2], "")
+	} else if match := connectedToRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		r = resolver.FindRoom("", match[1], "")
+	} else if match := nodeInRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		r = resolver.FindRoom(match[1], match[2], "")
+	} else if match := nodeOutRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		r = resolver.FindRoom(match[1], match[2], "")
+	}
+	if r != nil {
+		loc := "n/a"
+		if r.Location != nil {
+			loc = fmt.Sprintf("%s, %s, %s", r.Location.City, r.Location.State, r.Location.Country)
+		}
+		text := []string{
+			fmt.Sprintf("%s: %s", r.ID, r.Name),
+			fmt.Sprintf("Location: %s", loc),
+		}
+		if r.Comment != "" {
+			text = append(text, fmt.Sprintf("Comment: %s", r.Comment))
+		}
+		msg.Attachments[0].Text = strings.Join(text, "\n")
+		msg.Attachments[0].Color = slackColorGood
+		if verbose {
+			log.Printf("V: Enriched message with room information: %v", msg)
+		}
+	}
+
 	return msg
 }
 
-func getSlackMsg(evtLog *data.Log, evt *data.Event) *data.Message {
+func getSlackMsg(evtLog *data.Log, evt *data.Event, verbose bool) *data.Message {
 	msg := &data.Message{
 		Attachments: []data.Attachment{
 			{
@@ -131,7 +176,7 @@ func getSlackMsg(evtLog *data.Log, evt *data.Event) *data.Message {
 			},
 		},
 	}
-	return enrich(evtLog, evt, msg)
+	return enrich(evtLog, evt, msg, verbose)
 }
 
 // Run iterates over all logs provided in the log channel and posts new messages using the Slacker provided.
@@ -153,8 +198,7 @@ func Run(logChan chan *data.Log, slkr *Slacker, verbose bool) {
 			lastTs = evt.Ts
 
 			log.Printf("New message from %s (%s): %v", evtLog.ID, evtLog.Type, evt)
-			msg := getSlackMsg(evtLog, evt)
-			slkr.Post(msg)
+			slkr.Post(getSlackMsg(evtLog, evt, verbose))
 		}
 		if lastTs.After(notBefore) {
 			notBefore = lastTs

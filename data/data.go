@@ -38,6 +38,23 @@ type Event struct {
 	Msg string
 }
 
+// ActiveRooms represents the Active Rooms list provided by Yaesu.
+type ActiveRooms struct {
+	// LastUpdate is the timestamp of the last update parsed from the polled file.
+	LastUpdate time.Time
+	// Rooms is a list of all active rooms represented in the file.
+	Rooms []*Room
+}
+
+type Room struct {
+	ID       string
+	Act      string
+	DTMFID   string
+	Name     string
+	Location *Location
+	Comment  string
+}
+
 // ActiveNodes represents the Active Nodes list provided by Yaesu.
 type ActiveNodes struct {
 	// LastUpdate is the timestamp of the last update parsed from the polled file.

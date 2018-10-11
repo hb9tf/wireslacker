@@ -82,7 +82,7 @@ func main() {
 
 	// Create log channel and start processing of incoming data.
 	logChan := make(chan *data.Log)
-	go processor.Run(logChan, processor.NewSlacker(*webHook, *dry), *verbose)
+	go processor.Run(logChan, processor.NewSlacker(*webHook, *dry, *verbose), *verbose)
 
 	// Start a reader for each target which has been provided.
 	var wg sync.WaitGroup
