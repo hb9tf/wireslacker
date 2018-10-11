@@ -118,7 +118,12 @@ func enrich(evt *data.Event) {
 }
 
 func getSlackMsg(evtLog *data.Log, evt *data.Event) string {
-	return fmt.Sprintf("%s @ <!date^%d^{date_num} {time_secs}|%s>: %s", evtLog.ID, evt.Ts.Unix(), evt.Ts.Format(timePostFormat), evt.Msg)
+	return fmt.Sprintf(
+		"%s @ <!date^%d^{date_num} {time_secs}|%s>: %s",
+		evtLog.ID,
+		evt.Ts.Unix(),
+		evt.Ts.Format(timePostFormat),
+		evt.Msg)
 }
 
 // Run iterates over all logs provided in the log channel and posts new messages using the Slacker provided.

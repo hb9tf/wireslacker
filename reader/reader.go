@@ -31,6 +31,9 @@ var (
 	// logMsgRE is the regexp used to match a log event (timestamp plus message).
 	logMsgRE = regexp.MustCompile("([0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})[[:space:]]+(.*)")
 
+	// msgTrimSet is a string set of all characters to trim on either side of an event message.
+	msgTrimSet = " *-"
+
 	// httpTimeout defines how long to wait for a response before giving up.
 	httpTimeout = time.Duration(5 * time.Second)
 )
@@ -129,7 +132,7 @@ func (r *HTTP) Read() (*data.Log, error) {
 			log.Events = append(log.Events, &data.Event{
 				Raw: l,
 				Ts:  ts,
-				Msg: match[2],
+				Msg: strings.Trim(strings.TrimSpace(match[2]), msgTrimSet),
 			})
 		}
 	}
