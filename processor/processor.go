@@ -2,6 +2,7 @@ package processor
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -33,8 +34,12 @@ var (
 
 	inCallRE      = regexp.MustCompile("\\*-\\*-\\* In-Call from No.([0-9]+) \\*-\\*-\\*")
 	callStartRE   = regexp.MustCompile("\\*-\\*-\\* Call Start No.([0-9]+) \\*-\\*-\\*")
-	connectedToRE = regexp.MustCompile("Connected to .+\\(([0-9]+))\\)\\.")
+	connectedToRE = regexp.MustCompile("Connected to .+\\(([0-9]+)\\)\\.")
 )
+
+type SlackMsg struct {
+	Text string `json:"text,omitempty"`
+}
 
 // NewSlacker creates a new Slacker for the provided webhook.
 func NewSlacker(webhook string, dry bool) *Slacker {
@@ -54,8 +59,14 @@ type Slacker struct {
 
 // Post sends the provided message to the webhook, posting it in the channel.
 func (s *Slacker) Post(msg string) error {
-	body := []byte(fmt.Sprintf(`{"text":"%s"}`, msg))
-	req, err := http.NewRequest(httpPOST, s.webhook, bytes.NewBuffer(body))
+	body := &SlackMsg{
+		Text: msg,
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(httpPOST, s.webhook, bytes.NewBuffer(data))
 	req.Header.Set(httpContentType, httpJSON)
 	if s.dry {
 		log.Printf("DRY-MODE: Slack message: %v", req)
