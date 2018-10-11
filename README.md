@@ -42,17 +42,3 @@ Examples:
 ```
 ./wireslacker -targets="target1,target2" -webhook="https://hooks.slack.com/services/..."
 ```
-
-TODOs:
-
-* Improve the whole data model so it streams from the sources rather than reading
-  the whole log at source every time. Once the log gets bigger, this may pose a problem.
-
-* Move some of the flags and vars into a config file to make it more flexible.
-
-* Migrate the Slacker processor into something more generic (allowing other use).
-
-* Extend Slacker to format messages a bit more nicely or use at least templating.
-
-* Write unit tests.
-
