@@ -22,6 +22,7 @@ var (
 	dry          = flag.Bool("dry", false, "do not post to slack channel if true")
 )
 
+// read uses the provided reader to read the log from target and sends the data.Log to the logChan.
 func read(reader reader.Log, target string, verbose bool, logChan chan *data.Log) error {
 	if verbose {
 		log.Printf("V: Polling log %q", target)
