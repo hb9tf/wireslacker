@@ -44,7 +44,7 @@ var (
 	activeRoomsMu = &sync.RWMutex{}
 )
 
-func convertLatLon(lat, lon string) (string, string, err) {
+func convertLatLon(lat, lon string) (string, string, error) {
 	matchLat := latRE.FindStringSubmatch(lat)
 	if len(matchLat) < 2 {
 		return "", "", fmt.Errorf("unable to determine latitude: %s", lat)
