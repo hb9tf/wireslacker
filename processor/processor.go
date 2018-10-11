@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
@@ -115,7 +116,7 @@ func enrich(evtLog *data.Log, evt *data.Event, msg *data.Message, verbose bool) 
 		if n.Location != nil {
 			loc = fmt.Sprintf("%s, %s, %s", n.Location.City, n.Location.State, n.Location.Country)
 			if n.Location.Lat != "" && n.Location.Lon != "" {
-				loc = fmt.Sprintf("<https://www.google.com/maps/place/%s+%s|%s>", n.Location.Lat, n.Location.Lon, loc)
+				loc = fmt.Sprintf("<https://www.google.com/maps/place/%s+%s|%s>", url.PathEscape(n.Location.Lat), url.PathEscape(n.Location.Lon), loc)
 			}
 		}
 		text := []string{
