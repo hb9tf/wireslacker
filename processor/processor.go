@@ -19,6 +19,8 @@ const (
 	httpPOST        = "POST"
 	httpContentType = "Content-Type"
 	httpJSON        = "application/json"
+
+	slackColorGood = "good"
 )
 
 var (
@@ -37,10 +39,6 @@ var (
 	connectedToRE = regexp.MustCompile("Connected to .+\\(([0-9]+)\\)\\.")
 )
 
-type SlackMsg struct {
-	Text string `json:"text,omitempty"`
-}
-
 // NewSlacker creates a new Slacker for the provided webhook.
 func NewSlacker(webhook string, dry bool) *Slacker {
 	return &Slacker{
@@ -58,11 +56,8 @@ type Slacker struct {
 }
 
 // Post sends the provided message to the webhook, posting it in the channel.
-func (s *Slacker) Post(msg string) error {
-	body := &SlackMsg{
-		Text: msg,
-	}
-	data, err := json.Marshal(body)
+func (s *Slacker) Post(msg *data.Message) error {
+	data, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
@@ -92,38 +87,51 @@ func filter(evt *data.Event, notBefore time.Time) bool {
 }
 
 // enrich is a simple function to pass all events through and add more information if available.
-func enrich(evt *data.Event) {
+func enrich(evtLog *data.Log, evt *data.Event, msg *data.Message) *data.Message {
 	// Attempt to resolve some information about calling nodes.
+	var n *data.Node
 	if match := inCallRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
-		n := resolver.FindNode("", match[1], "")
-		if n != nil {
-			evt.Msg = fmt.Sprintf("In-Call from %s (%s, %s, %s)", n.ID, n.Location.City, n.Location.State, n.Location.Country)
-			log.Printf("V: Enriched in-call event with location: %v", evt)
-		}
+		n = resolver.FindNode("", match[1], "")
+	} else if match := callStartRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		n = resolver.FindNode("", match[1], "")
+	} else if match := connectedToRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		n = resolver.FindNode("", match[1], "")
 	}
-	if match := callStartRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
-		n := resolver.FindNode("", match[1], "")
-		if n != nil {
-			evt.Msg = fmt.Sprintf("Call Start %s (%s, %s, %s)", n.ID, n.Location.City, n.Location.State, n.Location.Country)
-			log.Printf("V: Enriched call-start event with location: %v", evt)
+	if n != nil {
+		loc := "n/a"
+		if n.Location != nil {
+			loc = fmt.Sprintf("%s, %s, %s", n.ID, n.Location.City, n.Location.State, n.Location.Country)
+			if n.Location.Lat != float64(0) && n.Location.Lon != float64(0) {
+				loc = fmt.Sprintf("<https://www.google.com/maps/@%f,%f%s>", n.Location.Lat, n.Location.Lon, loc)
+			}
 		}
-	}
-	if match := connectedToRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
-		n := resolver.FindNode("", match[1], "")
-		if n != nil {
-			evt.Msg = fmt.Sprintf("Connected to %s (%s, %s, %s).", n.ID, n.Location.City, n.Location.State, n.Location.Country)
-			log.Printf("V: Enriched connected-to event with location: %v", evt)
+		text := []string{
+			fmt.Sprintf("%s (%s):", n.ID, n.Mode),
+			fmt.Sprintf("Location: %s", loc),
 		}
+		if n.Freq != "" {
+			text = append(text, fmt.Sprintf("Frequency: %s (%s)", n.Freq, n.SQL))
+		}
+		msg.Attachments[0].Text = strings.Join(text, "\n")
+		msg.Attachments[0].Color = slackColorGood
+		log.Printf("V: Enriched message with location: %v", msg)
 	}
+	return msg
 }
 
-func getSlackMsg(evtLog *data.Log, evt *data.Event) string {
-	return fmt.Sprintf(
-		"%s @ <!date^%d^{date_num} {time_secs}|%s>: %s",
-		evtLog.ID,
-		evt.Ts.Unix(),
-		evt.Ts.Format(timePostFormat),
-		evt.Msg)
+func getSlackMsg(evtLog *data.Log, evt *data.Event) *data.Message {
+	msg := &data.Message{
+		Attachments: []data.Attachment{
+			{
+				Pretext: fmt.Sprintf(
+					"%s: %s",
+					evtLog.ID,
+					evt.Msg),
+				Ts: json.Number(evt.Ts.Unix()),
+			},
+		},
+	}
+	return enrich(evtLog, evt, msg)
 }
 
 // Run iterates over all logs provided in the log channel and posts new messages using the Slacker provided.
@@ -145,8 +153,8 @@ func Run(logChan chan *data.Log, slkr *Slacker, verbose bool) {
 			lastTs = evt.Ts
 
 			log.Printf("New message from %s (%s): %v", evtLog.ID, evtLog.Type, evt)
-			enrich(evt)
-			slkr.Post(getSlackMsg(evtLog, evt))
+			msg := getSlackMsg(evtLog, evt)
+			slkr.Post(msg)
 		}
 		if lastTs.After(notBefore) {
 			notBefore = lastTs

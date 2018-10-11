@@ -1,11 +1,13 @@
 package resolver
 
 import (
+	"fmt"
 	"html"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,9 +33,73 @@ var (
 	// nodeRE is the regexp used to parse the node information.
 	nodeRE = regexp.MustCompile("dataList\\[[0-9]+\\] = {id:\"(.*)\", dtmf_id:\"([0-9]+)\", call_sign:\"(.*)\", ana_dig:\"(.*)\", city:\"(.*)\", state:\"(.*)\", country:\"(.*)\", freq:\"(.*)\", sql:\"(.*)\", lat:\"(.*)\", lon:\"(.*)\", comment:\"(.*)\"};")
 
+	latRE = regexp.MustCompile("([NS]):([0-9]+) ([0-9]+)' ([0-9]+)")
+	lonRE = regexp.MustCompile("([EW]):([0-9]+) ([0-9]+)' ([0-9]+)")
+
 	activeNodes   *data.ActiveNodes
 	activeNodesMu = &sync.RWMutex{}
 )
+
+func getLatLon(lat, lon string) (float64, float64, error) {
+	matchLat := latRE.FindStringSubmatch(lat)
+	if len(matchLat) < 2 {
+		return float64(0), float64(0), fmt.Errorf("unable to determine latitude: %s", lat)
+	}
+	matchLon := lonRE.FindStringSubmatch(lon)
+	if len(matchLon) < 2 {
+		return float64(0), float64(0), fmt.Errorf("unable to determine longitude: %s", lon)
+	}
+	latDeg, err := strconv.ParseFloat(matchLat[2], 64)
+	if err != nil {
+		return float64(0), float64(0), fmt.Errorf("unable to convert latitude: %s", lat)
+	}
+	latMin, err := strconv.ParseFloat(matchLat[3], 64)
+	if err != nil {
+		return float64(0), float64(0), fmt.Errorf("unable to convert latitude: %s", lat)
+	}
+	latSec, err := strconv.ParseFloat(matchLat[4], 64)
+	if err != nil {
+		return float64(0), float64(0), fmt.Errorf("unable to convert latitude: %s", lat)
+	}
+	lonDeg, err := strconv.ParseFloat(matchLon[2], 64)
+	if err != nil {
+		return float64(0), float64(0), fmt.Errorf("unable to convert longitude: %s", lat)
+	}
+	lonMin, err := strconv.ParseFloat(matchLon[3], 64)
+	if err != nil {
+		return float64(0), float64(0), fmt.Errorf("unable to convert longitude: %s", lat)
+	}
+	lonSec, err := strconv.ParseFloat(matchLon[4], 64)
+	if err != nil {
+		return float64(0), float64(0), fmt.Errorf("unable to convert longitude: %s", lat)
+	}
+	return convertLatLon(matchLat[1], matchLon[1], latDeg, latMin, latSec, lonDeg, lonMin, lonSec)
+}
+
+func convertLatLon(latNS, lonEW string, latDeg, latMin, latSec, lonDeg, lonMin, lonSec float64) (float64, float64, error) {
+	if latNS != "N" && latNS != "S" {
+		return float64(0), float64(0), fmt.Errorf("latNS must be either N or S: %s", latNS)
+	}
+	if lonEW != "E" && lonEW != "W" {
+		return float64(0), float64(0), fmt.Errorf("longEW must be either E or W: %s", lonEW)
+	}
+
+	latMin = latMin + latSec/float64(60)
+	lonMin = lonMin + lonSec/float64(60)
+
+	latDeg = latDeg + latMin/float64(60)
+	lonDeg = lonDeg + lonMin/float64(60)
+
+	lat := latDeg
+	if latNS == "S" {
+		lat = -lat
+	}
+	lon := lonDeg
+	if lonEW == "E" {
+		lon = -lon
+	}
+	return lat, lon, nil
+}
 
 func read() (string, error) {
 	client := &http.Client{
@@ -76,17 +142,22 @@ func readAndDecodeNodes(verbose bool) (*data.ActiveNodes, error) {
 			continue
 		}
 		if match := nodeRE.FindStringSubmatch(l); len(match) > 1 {
+			lat, lon, err := getLatLon(html.UnescapeString(match[10]), html.UnescapeString(match[11]))
+			if err != nil {
+				lat = float64(0)
+				lon = float64(0)
+			}
 			n := &data.Node{
 				ID:       html.UnescapeString(match[1]),
 				DTMFID:   html.UnescapeString(match[2]),
 				Callsign: html.UnescapeString(match[3]),
-				AnaDig:   html.UnescapeString(match[4]),
+				Mode:     html.UnescapeString(match[4]),
 				Location: &data.Location{
 					City:    html.UnescapeString(match[5]),
 					State:   html.UnescapeString(match[6]),
 					Country: html.UnescapeString(match[7]),
-					Lat:     html.UnescapeString(match[10]),
-					Lon:     html.UnescapeString(match[11]),
+					Lat:     lat,
+					Lon:     lon,
 				},
 				Freq:    html.UnescapeString(match[8]),
 				SQL:     html.UnescapeString(match[9]),
