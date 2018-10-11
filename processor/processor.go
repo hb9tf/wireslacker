@@ -31,8 +31,9 @@ var (
 		"Browser connected from", // each poll creates such an entry, ignore them
 	}
 
-	inCallRE    = regexp.MustCompile("\\*-\\*-\\* In-Call from No.([0-9]+) \\*-\\*-\\*")
-	callStartRE = regexp.MustCompile("\\*-\\*-\\* Call Start No.([0-9]+) \\*-\\*-\\*")
+	inCallRE      = regexp.MustCompile("\\*-\\*-\\* In-Call from No.([0-9]+) \\*-\\*-\\*")
+	callStartRE   = regexp.MustCompile("\\*-\\*-\\* Call Start No.([0-9]+) \\*-\\*-\\*")
+	connectedToRE = regexp.MustCompile("Connected to .+\\(([0-9]+))\\)\\.")
 )
 
 // NewSlacker creates a new Slacker for the provided webhook.
@@ -93,7 +94,14 @@ func enrich(evt *data.Event) {
 		n := resolver.FindNode("", match[1], "")
 		if n != nil {
 			evt.Msg = fmt.Sprintf("Call Start %s (%s, %s, %s)", n.ID, n.Location.City, n.Location.State, n.Location.Country)
-			log.Printf("V: Enriched call start event with location: %v", evt)
+			log.Printf("V: Enriched call-start event with location: %v", evt)
+		}
+	}
+	if match := connectedToRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		n := resolver.FindNode("", match[1], "")
+		if n != nil {
+			evt.Msg = fmt.Sprintf("Connected to %s (%s, %s, %s).", n.ID, n.Location.City, n.Location.State, n.Location.Country)
+			log.Printf("V: Enriched connected-to event with location: %v", evt)
 		}
 	}
 }
