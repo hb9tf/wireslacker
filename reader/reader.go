@@ -28,6 +28,9 @@ var (
 	httpRoomRE = regexp.MustCompile("ROOM: <b>(.*) , (.*\\([0-9]+\\)) </b>")
 	// logMsgRE is the regexp used to match a log event (timestamp plus message).
 	logMsgRE = regexp.MustCompile("([0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})[[:space:]]+(.*)")
+
+	// httpTimeout defines how long to wait for a response before giving up.
+	httpTimeout = time.Duration(5 * time.Second)
 )
 
 // Log is an interface to provide access to Wires-X logs.
@@ -41,6 +44,9 @@ func New(target string, verbose bool) (Log, error) {
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
 		return &HTTP{
 			target,
+			&http.Client{
+				Timeout: httpTimeout,
+			},
 			verbose,
 		}, nil
 	}
@@ -50,12 +56,13 @@ func New(target string, verbose bool) (Log, error) {
 // HTTP implements the Log interface and reads the log from an HTTP/S target.
 type HTTP struct {
 	target  string
+	client  *http.Client
 	verbose bool
 }
 
 // read grabs the raw log from the target and returns it as a string.
 func (r *HTTP) read() (string, error) {
-	response, err := http.Get(r.target)
+	response, err := r.client.Get(r.target)
 	if err != nil {
 		return "", err
 	}
