@@ -22,6 +22,18 @@ var (
 	dry          = flag.Bool("dry", false, "do not post to slack channel if true")
 )
 
+func read(reader reader.Log, target string, verbose bool, logChan chan *data.Log) error {
+	if verbose {
+		log.Printf("V: Polling log %q", target)
+	}
+	evtLog, err := reader.Read()
+	if err != nil {
+		return err
+	}
+	logChan <- evtLog
+	return nil
+}
+
 // readEvery reads the Wires-X log from the provided target every d and sends the
 // parsed log to the provided logChan for further processing.
 // Note that only non-recoverable errors should return. Retryable ones should log only.
@@ -31,16 +43,14 @@ func readEvery(d time.Duration, target string, verbose bool, logChan chan *data.
 		return fmt.Errorf("unable to get reader: %v", err)
 	}
 
+	if err := read(reader, target, verbose, logChan); err != nil {
+		log.Printf("Unable to poll log %q (temporarily?): %v", target, err) // we don't want to abort in this case and retry later
+	}
 	for _ = range time.Tick(d) {
-		if verbose {
-			log.Printf("V: Polling log %q", target)
-		}
-		evtLog, err := reader.Read()
-		if err != nil {
+		if err := read(reader, target, verbose, logChan); err != nil {
 			log.Printf("Unable to poll log %q (temporarily?): %v", target, err)
 			continue // we don't want to abort in this case and retry later
 		}
-		logChan <- evtLog
 	}
 	return nil
 }
