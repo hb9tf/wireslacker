@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/finfinack/wireslacker/data"
+	"github.com/finfinack/wireslacker/resolver"
 )
 
 const (
@@ -28,6 +30,9 @@ var (
 	filterMsg = []string{
 		"Browser connected from", // each poll creates such an entry, ignore them
 	}
+
+	inCallRE    = regexp.MustCompile("\\*-\\*-\\* In-Call from No.[0-9]+ \\*-\\*-\\*")
+	callStartRE = regexp.MustCompile("\\*-\\*-\\* Call Start No.[0-9]+ \\*-\\*-\\*")
 )
 
 // NewSlacker creates a new Slacker for the provided webhook.
@@ -74,6 +79,25 @@ func filter(evt *data.Event, notBefore time.Time) bool {
 	return false
 }
 
+// enrich is a simple function to pass all events through and add more information if available.
+func enrich(evt *data.Event) {
+	// Attempt to resolve some information about calling nodes.
+	if match := inCallRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		n := resolver.FindNode("", match[1], "")
+		if n != nil {
+			evt.Msg = fmt.Sprintf("*-*-* In-Call from %s (%s, %s, %s) *-*-*", n.ID, n.Location.City, n.Location.State, n.Location.Country)
+			log.Printf("V: Enriched in-call event with location: %v", evt)
+		}
+	}
+	if match := callStartRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		n := resolver.FindNode("", match[1], "")
+		if n != nil {
+			evt.Msg = fmt.Sprintf("*-*-* Call Start %s (%s, %s, %s) *-*-*", n.ID, n.Location.City, n.Location.State, n.Location.Country)
+			log.Printf("V: Enriched call start event with location: %v", evt)
+		}
+	}
+}
+
 // Run iterates over all logs provided in the log channel and posts new messages using the Slacker provided.
 func Run(logChan chan *data.Log, slkr *Slacker, verbose bool) {
 	logCount := 0
@@ -91,7 +115,9 @@ func Run(logChan chan *data.Log, slkr *Slacker, verbose bool) {
 				continue
 			}
 			lastTs = evt.Ts
+
 			log.Printf("New message from %s (%s): %v", evtLog.ID, evtLog.Type, evt)
+			enrich(evt)
 			slkr.Post(fmt.Sprintf("%s (%s) @ %s: %s", evtLog.ID, evtLog.Type, evt.Ts.Format(timePostFormat), evt.Msg))
 		}
 		if lastTs.After(notBefore) {

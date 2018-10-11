@@ -12,6 +12,7 @@ import (
 	"github.com/finfinack/wireslacker/data"
 	"github.com/finfinack/wireslacker/processor"
 	"github.com/finfinack/wireslacker/reader"
+	"github.com/finfinack/wireslacker/resolver"
 )
 
 var (
@@ -75,6 +76,9 @@ func main() {
 		fmt.Printf("unable to parse provided location %q: %v\n", *location, err)
 		os.Exit(1)
 	}
+
+	// Start auto-updating of active nodes cache.
+	go resolver.AutoUpdate(*verbose)
 
 	// Create log channel and start processing of incoming data.
 	logChan := make(chan *data.Log)

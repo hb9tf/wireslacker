@@ -34,3 +34,30 @@ type Event struct {
 	Ts  time.Time
 	Msg string
 }
+
+// ActiveNodes represents the Active Nodes list provided by Yaesu.
+type ActiveNodes struct {
+	// LastUpdate is the timestamp of the last update parsed from the polled file.
+	LastUpdate time.Time
+	// Nodes is a list of all active nodes represented in the file.
+	Nodes []*Node
+}
+
+type Node struct {
+	ID       string
+	DTMFID   string
+	Callsign string
+	AnaDig   string
+	Location *Location
+	Freq     string
+	SQL      string
+	Comment  string
+}
+
+type Location struct {
+	City    string
+	State   string
+	Country string
+	Lat     string
+	Lon     string
+}
