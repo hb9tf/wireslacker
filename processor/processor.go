@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,9 +40,8 @@ var (
 	connectedToRE = regexp.MustCompile("Connected to (.+)\\(([0-9]+)\\)\\.")
 	// Node only RE
 	nodeInCallRE = regexp.MustCompile("In-Call from No.([0-9]+)")
-	// Room only RE
-	nodeInRE  = regexp.MustCompile("(.+)\\(([0-9]+)\\) IN\\.")
-	nodeOutRE = regexp.MustCompile("(.+)\\(([0-9]+)\\) OUT\\.")
+	nodeInRE     = regexp.MustCompile("(.+)\\(([0-9]+)\\) IN\\.")
+	nodeOutRE    = regexp.MustCompile("(.+)\\(([0-9]+)\\) OUT\\.")
 )
 
 // NewSlacker creates a new Slacker for the provided webhook.
@@ -105,6 +105,10 @@ func enrich(evtLog *data.Log, evt *data.Event, msg *data.Message, verbose bool) 
 		n = resolver.FindNode(match[1], match[2], "")
 	} else if match := connectedToRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
 		n = resolver.FindNode("", match[1], "")
+	} else if match := nodeInRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		n = resolver.FindNode(match[1], match[2], "")
+	} else if match := nodeOutRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
+		n = resolver.FindNode(match[1], match[2], "")
 	}
 	if n != nil {
 		loc := "n/a"
@@ -137,10 +141,6 @@ func enrich(evtLog *data.Log, evt *data.Event, msg *data.Message, verbose bool) 
 		r = resolver.FindRoom(match[1], match[2], "")
 	} else if match := connectedToRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
 		r = resolver.FindRoom("", match[1], "")
-	} else if match := nodeInRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
-		r = resolver.FindRoom(match[1], match[2], "")
-	} else if match := nodeOutRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
-		r = resolver.FindRoom(match[1], match[2], "")
 	}
 	if r != nil {
 		loc := "n/a"
@@ -172,7 +172,7 @@ func getSlackMsg(evtLog *data.Log, evt *data.Event, verbose bool) *data.Message 
 					"%s: %s",
 					evtLog.ID,
 					evt.Msg),
-				Ts: json.Number(evt.Ts.Unix()),
+				Ts: json.Number(strconv.FormatInt(evt.Ts.Unix(), 10)),
 			},
 		},
 	}
@@ -198,7 +198,9 @@ func Run(logChan chan *data.Log, slkr *Slacker, verbose bool) {
 			lastTs = evt.Ts
 
 			log.Printf("New message from %s (%s): %v", evtLog.ID, evtLog.Type, evt)
-			slkr.Post(getSlackMsg(evtLog, evt, verbose))
+			if err := slkr.Post(getSlackMsg(evtLog, evt, verbose)); err != nil {
+				log.Printf("Error posting message to Slack: %v", err)
+			}
 		}
 		if lastTs.After(notBefore) {
 			notBefore = lastTs
