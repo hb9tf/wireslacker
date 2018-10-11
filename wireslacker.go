@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/finfinack/wireslacker/data"
-	"github.com/finfinack/wireslacker/processor"
-	"github.com/finfinack/wireslacker/reader"
-	"github.com/finfinack/wireslacker/resolver"
+	"github.com/hb9tf/wireslacker/data"
+	"github.com/hb9tf/wireslacker/processor"
+	"github.com/hb9tf/wireslacker/reader"
+	"github.com/hb9tf/wireslacker/resolver"
 )
 
 var (

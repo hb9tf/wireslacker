@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/finfinack/wireslacker/data"
+	"github.com/hb9tf/wireslacker/data"
 )
 
 const (

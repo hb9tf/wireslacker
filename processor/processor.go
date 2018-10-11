@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/finfinack/wireslacker/data"
-	"github.com/finfinack/wireslacker/resolver"
+	"github.com/hb9tf/wireslacker/data"
+	"github.com/hb9tf/wireslacker/resolver"
 )
 
 const (
@@ -85,17 +85,21 @@ func enrich(evt *data.Event) {
 	if match := inCallRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
 		n := resolver.FindNode("", match[1], "")
 		if n != nil {
-			evt.Msg = fmt.Sprintf("*-*-* In-Call from %s (%s, %s, %s) *-*-*", n.ID, n.Location.City, n.Location.State, n.Location.Country)
+			evt.Msg = fmt.Sprintf("In-Call from %s (%s, %s, %s)", n.ID, n.Location.City, n.Location.State, n.Location.Country)
 			log.Printf("V: Enriched in-call event with location: %v", evt)
 		}
 	}
 	if match := callStartRE.FindStringSubmatch(evt.Msg); len(match) > 1 {
 		n := resolver.FindNode("", match[1], "")
 		if n != nil {
-			evt.Msg = fmt.Sprintf("*-*-* Call Start %s (%s, %s, %s) *-*-*", n.ID, n.Location.City, n.Location.State, n.Location.Country)
+			evt.Msg = fmt.Sprintf("Call Start %s (%s, %s, %s)", n.ID, n.Location.City, n.Location.State, n.Location.Country)
 			log.Printf("V: Enriched call start event with location: %v", evt)
 		}
 	}
+}
+
+func getSlackMsg(evtLog *data.Log, evt *data.Event) string {
+	return fmt.Sprintf("%s @ <!date^%s^Posted {date_num} {time_secs}|%s>: %s", evtLog.ID, evt.Ts.Unix(), evt.Ts.Format(timePostFormat), evt.Msg)
 }
 
 // Run iterates over all logs provided in the log channel and posts new messages using the Slacker provided.
@@ -118,7 +122,7 @@ func Run(logChan chan *data.Log, slkr *Slacker, verbose bool) {
 
 			log.Printf("New message from %s (%s): %v", evtLog.ID, evtLog.Type, evt)
 			enrich(evt)
-			slkr.Post(fmt.Sprintf("%s (%s) @ %s: %s", evtLog.ID, evtLog.Type, evt.Ts.Format(timePostFormat), evt.Msg))
+			slkr.Post(getSlackMsg(evtLog, evt))
 		}
 		if lastTs.After(notBefore) {
 			notBefore = lastTs
