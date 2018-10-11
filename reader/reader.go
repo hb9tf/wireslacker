@@ -24,6 +24,8 @@ var (
 	httpVersionRE = regexp.MustCompile("<body><a href=\".*\">(WIRES-X .*)")
 	// httpNodeRE is the regexp used to find the node info of an HTTP/S based log.
 	httpNodeRE = regexp.MustCompile("NODE: <b>(.*) , (.*\\([0-9]+\\)) </b>")
+	// httpNodeConnectedRE is the regexp used to find out what node the repeater is connected to.
+	httpNodeConnectedRE = regexp.MustCompile("<br>Connect to <b>(.*)</b>")
 	// httpRoomRE is the regexp used to find the room info of an HTTP/S based log.
 	httpRoomRE = regexp.MustCompile("ROOM: <b>(.*) , (.*\\([0-9]+\\)) </b>")
 	// logMsgRE is the regexp used to match a log event (timestamp plus message).
@@ -110,6 +112,11 @@ func (r *HTTP) Read() (*data.Log, error) {
 		}
 		if match := httpRoomRE.FindStringSubmatch(l); len(match) > 1 {
 			log.ID = fmt.Sprintf("%s, %s", match[1], match[2])
+			continue
+		}
+		// Other contextual information
+		if match := httpNodeConnectedRE.FindStringSubmatch(l); len(match) > 1 {
+			log.ConnectedTo = match[1]
 			continue
 		}
 
