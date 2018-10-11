@@ -18,6 +18,7 @@ var (
 	targets      = flag.String("targets", "", "coma separated paths or URLs to the log files")
 	readInterval = flag.Duration("readInterval", 10*time.Second, "interval in which to read the provided logs")
 	webHook      = flag.String("webhook", "", "webhook to use to post to slack")
+	location     = flag.String("location", "Local", "location of the Wires-X server - see https://golang.org/pkg/time/#Location for details")
 	verbose      = flag.Bool("v", false, "log more detailed messages")
 	dry          = flag.Bool("dry", false, "do not post to slack channel if true")
 )
@@ -38,8 +39,8 @@ func read(reader reader.Log, target string, verbose bool, logChan chan *data.Log
 // readEvery reads the Wires-X log from the provided target every d and sends the
 // parsed log to the provided logChan for further processing.
 // Note that only non-recoverable errors should return. Retryable ones should log only.
-func readEvery(d time.Duration, target string, verbose bool, logChan chan *data.Log) error {
-	reader, err := reader.New(target, verbose)
+func readEvery(d time.Duration, target string, verbose bool, logChan chan *data.Log, loc *time.Location) error {
+	reader, err := reader.New(target, loc, verbose)
 	if err != nil {
 		return fmt.Errorf("unable to get reader: %v", err)
 	}
@@ -69,6 +70,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	loc, err := time.LoadLocation(*location)
+	if err != nil {
+		fmt.Printf("unable to parse provided location %q: %v\n", *location, err)
+		os.Exit(1)
+	}
+
 	// Create log channel and start processing of incoming data.
 	logChan := make(chan *data.Log)
 	go processor.Run(logChan, processor.NewSlacker(*webHook, *dry), *verbose)
@@ -80,7 +87,7 @@ func main() {
 		go func(target string) {
 			defer wg.Done()
 			log.Printf("Start polling %q\n", target)
-			if err := readEvery(*readInterval, target, *verbose, logChan); err != nil {
+			if err := readEvery(*readInterval, target, *verbose, logChan, loc); err != nil {
 				log.Printf("Unable to poll log %q (stopping): %v", target, err)
 				return
 			}

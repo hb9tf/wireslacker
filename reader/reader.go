@@ -40,13 +40,14 @@ type Log interface {
 }
 
 // New creates a new Log reader matching the provided target.
-func New(target string, verbose bool) (Log, error) {
+func New(target string, loc *time.Location, verbose bool) (Log, error) {
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
 		return &HTTP{
 			target,
 			&http.Client{
 				Timeout: httpTimeout,
 			},
+			loc,
 			verbose,
 		}, nil
 	}
@@ -57,6 +58,7 @@ func New(target string, verbose bool) (Log, error) {
 type HTTP struct {
 	target  string
 	client  *http.Client
+	loc     *time.Location
 	verbose bool
 }
 
@@ -113,7 +115,7 @@ func (r *HTTP) Read() (*data.Log, error) {
 
 		// Actual message parsing
 		if match := logMsgRE.FindStringSubmatch(l); len(match) > 1 {
-			ts, err := time.Parse(timeFormat, match[1])
+			ts, err := time.ParseInLocation(timeFormat, match[1], r.loc)
 			if err != nil {
 				continue
 			}

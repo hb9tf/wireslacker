@@ -19,9 +19,6 @@ const (
 )
 
 var (
-	// lastSeen is used to keep the timestamp of the last event that was processed.
-	// Only if a newer event is seen, it is processed/posted.
-	lastSeen = time.Now()
 	// timePostFormat is the date/time format presented in the Slack post.
 	timePostFormat = "2006-01-02 15:04:05"
 
@@ -55,7 +52,7 @@ func (s *Slacker) Post(msg string) error {
 	req, err := http.NewRequest(httpPOST, s.webhook, bytes.NewBuffer(body))
 	req.Header.Set(httpContentType, httpJSON)
 	if s.dry {
-		log.Printf("DRY-MODE: Slack message: %v\n", req)
+		log.Printf("DRY-MODE: Slack message: %v", req)
 		return nil
 	}
 	_, err = s.client.Do(req)
@@ -63,12 +60,12 @@ func (s *Slacker) Post(msg string) error {
 }
 
 // filter is a simple message filter which decides whether to drop a provided event.
-// All events which are older than the lastSeen are ignored as well as messages
-// which contains any of the filter strings.
-func filter(evt *data.Event) bool {
-	if !evt.Ts.After(lastSeen) {
+func filter(evt *data.Event, notBefore time.Time) bool {
+	// Filter all events which are older than notBefore (avoid posting the same thing twice).
+	if !evt.Ts.After(notBefore) {
 		return true
 	}
+	// Filter all events containing any of the filter strings.
 	for _, fm := range filterMsg {
 		if strings.Contains(evt.Msg, fm) {
 			return true
@@ -80,6 +77,7 @@ func filter(evt *data.Event) bool {
 // Run iterates over all logs provided in the log channel and posts new messages using the Slacker provided.
 func Run(logChan chan *data.Log, slkr *Slacker, verbose bool) {
 	logCount := 0
+	notBefore := time.Now()
 	for evtLog := range logChan {
 		logCount++
 		evtCount := 0
@@ -88,17 +86,19 @@ func Run(logChan chan *data.Log, slkr *Slacker, verbose bool) {
 		var lastTs time.Time
 		for _, evt := range evtLog.Events {
 			evtCount++
-			if filter(evt) {
+			if filter(evt, notBefore) {
 				evtFltrCount++
 				continue
 			}
 			lastTs = evt.Ts
-			log.Printf("New message from %s (%s): %v\n", evtLog.ID, evtLog.Type, evt)
+			log.Printf("New message from %s (%s): %v", evtLog.ID, evtLog.Type, evt)
 			slkr.Post(fmt.Sprintf("%s (%s) @ %s: %s", evtLog.ID, evtLog.Type, evt.Ts.Format(timePostFormat), evt.Msg))
 		}
-		lastSeen = lastTs
+		if lastTs.After(notBefore) {
+			notBefore = lastTs
+		}
 		if verbose {
-			log.Printf("V: Processed log %d, total of %d events, filtered %d", logCount, evtCount, evtFltrCount)
+			log.Printf("V: Processed log #%d, total of %d events, filtered %d", logCount, evtCount, evtFltrCount)
 		}
 	}
 }
