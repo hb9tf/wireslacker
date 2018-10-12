@@ -53,7 +53,7 @@ func convertLatLon(lat, lon string) (string, string, error) {
 	if len(matchLon) < 2 {
 		return "", "", fmt.Errorf("unable to determine longitude: %s", lon)
 	}
-	return fmt.Sprintf("%s°%s'%s\"%s", matchLat[2], matchLat[3], matchLat[4], matchLat[1]), fmt.Sprintf("%s°%s'%s\"%s", matchLon[2], matchLon[3], matchLon[4], matchLon[1]), nil
+	return fmt.Sprintf("%s %s %s %s", matchLat[2], matchLat[3], matchLat[4], matchLat[1]), fmt.Sprintf("%s %s %s %s", matchLon[2], matchLon[3], matchLon[4], matchLon[1]), nil
 }
 
 func read(target string) (string, error) {
