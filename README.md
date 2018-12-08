@@ -3,7 +3,7 @@
 WireSlacker is a daemon to read Wires-X logs and update a slack channel with news.
 
 ```
-go build src/github.com/finfinack/wireslacker/wireslacker.go
+go build src/github.com/hb9tf/wireslacker/wireslacker.go
 ```
 
 In order to run, you need two things:
