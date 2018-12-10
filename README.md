@@ -13,7 +13,7 @@ In order to run, you need two things:
   Currently, only HTTP(S) targets are supported while file reads would also be possible.
   The target should look something like this:
 
-    * For node log: http://IP:port/roomlog.html?wipassword=password
+    * For node log: http://IP:port/nodelog.html?wipassword=password
     * For room log: http://IP:port/roomlog.html?wipassword=password
 
   Where obviously some variables need to be filled in. The default port is 46190 and can be
