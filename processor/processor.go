@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -173,7 +172,7 @@ func getSlackMsg(evtLog *data.Log, evt *data.Event, verbose bool) *data.Message 
 					"%s: %s",
 					evtLog.ID,
 					evt.Msg),
-				Ts: json.Number(strconv.FormatInt(evt.Ts.Unix(), 10)),
+				//Ts: json.Number(strconv.FormatInt(evt.Ts.Unix(), 10)),
 			},
 		},
 	}
